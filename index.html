@@ -1,19 +1,96 @@
-<!doctype html>
-<div id=asd></div>
-<script>
-	console.log("Yes, this thing actually runs!");
-	var Module = {
-		print: (...args) => console.log(...args),
-		canvas: null,
-		setStatus: (text) => {
-			document.getElementById("asd").innerText = text;
-		},
-		totalDependencies: 0,
-		monitorRunDependencies: (left) => {
-			this.totalDependencies = Math.max(this.totalDependencies, left);
-			Module.setStatus(left ? (this.totalDependencies-left) + '/' + this.totalDependencies : '100%');
-		}
-	};
+<!DOCTYPE html>
+<div id="asd"></div>
+<script type="module">
+  function wasmThreadsSupported() {
+    // WebAssembly 1.0
+    const source = Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00);
+    if (
+      typeof WebAssembly !== "object" ||
+      typeof WebAssembly.validate !== "function"
+    )
+      return false;
+    if (!WebAssembly.validate(source)) return false;
+
+    // SharedArrayBuffer
+    if (typeof SharedArrayBuffer !== "function") return false;
+
+    // Atomics
+    if (typeof Atomics !== "object") return false;
+
+    // Shared memory
+    const mem = new WebAssembly.Memory({
+      shared: true,
+      initial: 8,
+      maximum: 16,
+    });
+    if (!(mem.buffer instanceof SharedArrayBuffer)) return false;
+
+    // Structured cloning
+    try {
+      // You have to make sure nobody cares about these messages!
+      window.postMessage(mem, "*");
+    } catch (e) {
+      return false;
+    }
+
+    // Growable shared memory (optional)
+    try {
+      mem.grow(8);
+    } catch (e) {
+      return false;
+    }
+
+    return true;
+  }
+
+  console.log(wasmThreadsSupported());
+
+  import Stockfish from "./sf171-79.js";
+
+  let Module = {};
+
+  /**
+   * assign a listener to Module.listen
+   * @type {function(string):void}
+   */
+  if (!Module["listen"]) Module["listen"] = (data) => console.log(data);
+
+  /**
+   * assign an error handler to Module.onError
+   * @type {function(string):void}
+   */
+  if (!Module["onError"]) Module["onError"] = (data) => console.error(data);
+
+  /** @private, @param {number=} index */
+  Module["getRecommendedNnue"] = (index = 0) =>
+    UTF8ToString(_getRecommendedNnue(index));
+
+  /** @private, @param {Uint8Array} buf, @param {number=} index */
+  Module["setNnueBuffer"] = function (buf, index = 0) {
+    if (!buf) throw new Error("buf is null");
+    if (buf.byteLength <= 0) throw new Error(`${buf.byteLength} bytes?`);
+    const heapBuf = _malloc(buf.byteLength); // deallocated in src/wasm/glue.cpp
+    if (!heapBuf) throw new Error(`could not allocate ${buf.byteLength} bytes`);
+    Module["HEAPU8"].set(buf, heapBuf);
+    _setNnueBuffer(heapBuf, buf.byteLength, index);
+  };
+
+  /** @private, @param {string} command */
+  Module["uci"] = function (command) {
+    const sz = lengthBytesUTF8(command) + 1;
+    const utf8 = _malloc(sz); // deallocated in src/wasm/glue.cpp
+    if (!utf8) throw new Error(`Could not allocate ${sz} bytes`);
+    stringToUTF8(command, utf8, sz);
+    _uci(utf8);
+  };
+
+  /** @private, @param {string} data */
+  Module["print"] = (data) => Module["listen"]?.(data);
+
+  /** @private, @param {string} data */
+  Module["printErr"] = (data) => Module["onError"]?.(data);
+
+  (async () => {
+    const sf = await Stockfish();
+  })();
 </script>
-<script type="module" src='initModule.js'></script>
-<script async type="module" src='sf171-79.js'></script>
