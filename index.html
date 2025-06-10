@@ -1,0 +1,19 @@
+<!doctype html>
+<div id=asd></div>
+<script>
+	console.log("Yes, this thing actually runs!");
+	var Module = {
+		print: (...args) => console.log(...args),
+		canvas: null,
+		setStatus: (text) => {
+			document.getElementById("asd").innerText = text;
+		},
+		totalDependencies: 0,
+		monitorRunDependencies: (left) => {
+			this.totalDependencies = Math.max(this.totalDependencies, left);
+			Module.setStatus(left ? (this.totalDependencies-left) + '/' + this.totalDependencies : '100%');
+		}
+	};
+</script>
+<script type="module" src='initModule.js'></script>
+<script async type="module" src='sf171-79.js'></script>
