@@ -28,7 +28,7 @@ Bun.serve({
       });
     } else if (path === "/sf171-79.wasm") {
       const file = Bun.file("./sf171-79.wasm");
-      const content = await file.text();
+      const content = await file.arrayBuffer();
       headers.set("Content-Type", "application/wasm");
 
       return new Response(content, {
